@@ -204,6 +204,30 @@
             border-bottom: 1px solid rgba(133, 79, 255, 0.1);
             position: relative;
         }
+        
+        .n8n-chat-widget .new-chat-button {
+            position: absolute;
+            left: 16px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: none;
+            border: 1px solid rgba(133, 79, 255, 0.3);
+            border-radius: 4px;
+            color: var(--chat--color-font);
+            cursor: pointer;
+            padding: 4px 8px;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            font-size: 12px;
+            opacity: 0.8;
+            transition: all 0.2s;
+        }
+        
+        .n8n-chat-widget .new-chat-button:hover {
+            opacity: 1;
+            background: rgba(133, 79, 255, 0.1);
+        }
 
         .n8n-chat-widget .close-button {
             position: absolute;
@@ -929,14 +953,48 @@
     window.N8NChatWidgetInitialized = true;
 
     let currentSessionId = '';
+    let chatHistory = [];
+    
+    // Función para guardar el historial del chat en localStorage
+    function saveChatHistory() {
+        localStorage.setItem('chatHistory', JSON.stringify(chatHistory));
+        localStorage.setItem('currentSessionId', currentSessionId);
+    }
+    
+    // Función para cargar el historial del chat desde localStorage
+    function loadChatHistory() {
+        const savedHistory = localStorage.getItem('chatHistory');
+        const savedSessionId = localStorage.getItem('currentSessionId');
+        
+        if (savedHistory && savedSessionId) {
+            chatHistory = JSON.parse(savedHistory);
+            currentSessionId = savedSessionId;
+            return true;
+        }
+        return false;
+    }
+    
+    // Función para limpiar el historial del chat
+    function clearChatHistory() {
+        chatHistory = [];
+        localStorage.removeItem('chatHistory');
+        localStorage.removeItem('currentSessionId');
+    }
 
     // Funciones principales
     function generateUUID() {
         return crypto.randomUUID();
     }
 
-    function startNewConversation() {
-        currentSessionId = generateUUID();
+    function startNewConversation(newChat = false) {
+        // Si se solicita un nuevo chat o no hay historial guardado, generar nueva sesión
+        if (newChat) {
+            clearChatHistory();
+            currentSessionId = generateUUID();
+        } else if (!loadChatHistory()) {
+            currentSessionId = generateUUID();
+        }
+        
         const data = [{
             action: "loadPreviousSession",
             sessionId: currentSessionId,
@@ -961,14 +1019,24 @@
             chatInterface.classList.add('fade-in');
             chatInterface.classList.add('active');
             
-            // Continuar con el resto del código de inicio de conversación
-            fetch(config.contact.chat.webhook.url, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(data)
-            })
+            // Si hay historial guardado y no es un nuevo chat, mostrar los mensajes guardados
+            if (chatHistory.length > 0 && !newChat) {
+                chatHistory.forEach(msg => {
+                    const messageDiv = document.createElement('div');
+                    messageDiv.className = `chat-message ${msg.type}`;
+                    messageDiv.innerHTML = msg.content;
+                    messagesContainer.appendChild(messageDiv);
+                });
+                messagesContainer.scrollTop = messagesContainer.scrollHeight;
+            } else {
+                // Si no hay historial o es un nuevo chat, iniciar nueva conversación con el servidor
+                fetch(config.contact.chat.webhook.url, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(data)
+                })
             .then(response => {
                 if (!response.ok) {
                     throw new Error('Error en la respuesta de la API');
@@ -992,6 +1060,13 @@
                 `;
                 messagesContainer.appendChild(botMessageDiv);
                 messagesContainer.scrollTop = messagesContainer.scrollHeight;
+                
+                // Guardar el mensaje en el historial
+                chatHistory.push({
+                    type: 'bot',
+                    content: botMessageDiv.innerHTML
+                });
+                saveChatHistory();
             })
             .catch(error => {
                 console.error('Error:', error);
@@ -1011,7 +1086,15 @@
                 `;
                 messagesContainer.appendChild(errorMessageDiv);
                 messagesContainer.scrollTop = messagesContainer.scrollHeight;
+                
+                // Guardar el mensaje de error en el historial
+                chatHistory.push({
+                    type: 'bot',
+                    content: errorMessageDiv.innerHTML
+                });
+                saveChatHistory();
             });
+            }
         }, 300); // Tiempo corto para que se vea la animación
     }
 
@@ -1221,13 +1304,58 @@
         });
     });
 
-    // Configurar el botón de chat - AQUÍ ESTÁ EL CAMBIO PRINCIPAL
+    // Configurar el botón de chat
     if (config.contact.chat.enabled) {
         const chatButton = chatContainer.querySelector('.chat-button');
         if (chatButton) {
-            chatButton.addEventListener('click', startNewConversation);
+            chatButton.addEventListener('click', () => startNewConversation(false));
         }
     }
+    
+    // Añadir botón para iniciar nuevo chat
+    const brandHeader = chatContainer.querySelector('.brand-header');
+    const newChatButton = document.createElement('button');
+    newChatButton.className = 'new-chat-button';
+    newChatButton.innerHTML = `
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16">
+            <path fill="currentColor" d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/>
+        </svg>
+        Nuevo Chat
+    `;
+    newChatButton.style.cssText = `
+        position: absolute;
+        left: 16px;
+        top: 50%;
+        transform: translateY(-50%);
+        background: none;
+        border: none;
+        color: var(--chat--color-font);
+        cursor: pointer;
+        padding: 4px 8px;
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        font-size: 12px;
+        opacity: 0.8;
+        transition: opacity 0.2s;
+    `;
+    newChatButton.addEventListener('click', () => {
+        // Limpiar el contenedor de mensajes
+        const messagesContainer = chatContainer.querySelector('.chat-messages');
+        messagesContainer.innerHTML = `
+            <div class="chat-loader">
+                <div class="chat-loader-dots">
+                    <div class="chat-loader-dot"></div>
+                    <div class="chat-loader-dot"></div>
+                    <div class="chat-loader-dot"></div>
+                </div>
+            </div>
+        `;
+        
+        // Iniciar una nueva conversación
+        startNewConversation(true);
+    });
+    brandHeader.appendChild(newChatButton);
 
     // Configurar el botón de alternar chat
     toggleButton.addEventListener('click', () => {
@@ -1239,6 +1367,32 @@
         } else {
             chatContainer.style.visibility = 'visible';
             chatContainer.classList.add('open');
+            
+            // Verificar si hay un chat guardado para recuperarlo
+            if (loadChatHistory() && chatHistory.length > 0) {
+                // Si la interfaz de chat no está activa, activarla
+                if (!chatInterface.classList.contains('active')) {
+                    const brandHeader = chatContainer.querySelector('.brand-header');
+                    const newConversation = chatContainer.querySelector('.new-conversation');
+                    
+                    brandHeader.style.display = 'none';
+                    newConversation.style.display = 'none';
+                    
+                    chatInterface.classList.add('active');
+                    
+                    // Mostrar los mensajes guardados
+                    const messagesContainer = chatContainer.querySelector('.chat-messages');
+                    messagesContainer.innerHTML = '';
+                    
+                    chatHistory.forEach(msg => {
+                        const messageDiv = document.createElement('div');
+                        messageDiv.className = `chat-message ${msg.type}`;
+                        messageDiv.innerHTML = msg.content;
+                        messagesContainer.appendChild(messageDiv);
+                    });
+                    messagesContainer.scrollTop = messagesContainer.scrollHeight;
+                }
+            }
         }
     });
 
@@ -1480,6 +1634,13 @@
         `;
         messagesContainer.appendChild(userMessageDiv);
         messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        
+        // Guardar el mensaje del usuario en el historial
+        chatHistory.push({
+            type: 'user',
+            content: userMessageDiv.innerHTML
+        });
+        saveChatHistory();
 
         // Añadir loader con los tres puntos de carga
         const loader = document.createElement('div');
@@ -1532,6 +1693,13 @@
             `;
             messagesContainer.appendChild(botMessageDiv);
             messagesContainer.scrollTop = messagesContainer.scrollHeight;
+            
+            // Guardar el mensaje del bot en el historial
+            chatHistory.push({
+                type: 'bot',
+                content: botMessageDiv.innerHTML
+            });
+            saveChatHistory();
         } catch (error) {
             // Eliminar loader en caso de error
             loader.remove();
@@ -1554,6 +1722,13 @@
             `;
             messagesContainer.appendChild(errorMessageDiv);
             messagesContainer.scrollTop = messagesContainer.scrollHeight;
+            
+            // Guardar el mensaje de error en el historial
+            chatHistory.push({
+                type: 'bot',
+                content: errorMessageDiv.innerHTML
+            });
+            saveChatHistory();
         }
     }
 
