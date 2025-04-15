@@ -1,3 +1,4 @@
+
 // Chat Widget Script
 (function() {
     // Variables de texto para traducción
@@ -1464,6 +1465,8 @@
         const messagesContainer = chatContainer.querySelector('.chat-messages');
         const messageData = {
             message: message,
+            chatInput: message, // Variable que espera n8n para procesar correctamente el mensaje
+            sessionId: currentSessionId, // Añadimos el ID de sesión para mejor seguimiento
             timestamp: new Date().toISOString()
         };
 
@@ -1479,7 +1482,7 @@
         messagesContainer.appendChild(userMessageDiv);
         messagesContainer.scrollTop = messagesContainer.scrollHeight;
 
-        // Añadir loader
+        // Añadir loader con los tres puntos de carga
         const loader = document.createElement('div');
         loader.className = 'chat-message bot';
         loader.innerHTML = `
@@ -1489,10 +1492,12 @@
                 </svg>
                 <strong style="margin-right: 8px; font-size: 16px; color: var(--chat--color-primary);">${TEXTOS.atencionCliente}</strong>
             </div>
-            <div class="typing-indicator">
-                <span></span>
-                <span></span>
-                <span></span>
+            <div style="display: flex; align-items: center; margin-top: 8px;">
+                <div class="chat-loader-dots" style="display: flex;">
+                    <div class="chat-loader-dot" style="width: 8px; height: 8px; background: var(--chat--color-primary); border-radius: 50%; animation: bounce 1.4s infinite ease-in-out; margin-right: 4px;"></div>
+                    <div class="chat-loader-dot" style="width: 8px; height: 8px; background: var(--chat--color-primary); border-radius: 50%; animation: bounce 1.4s infinite ease-in-out; animation-delay: -0.16s; margin-right: 4px;"></div>
+                    <div class="chat-loader-dot" style="width: 8px; height: 8px; background: var(--chat--color-primary); border-radius: 50%; animation: bounce 1.4s infinite ease-in-out; animation-delay: -0.32s;"></div>
+                </div>
             </div>
         `;
         messagesContainer.appendChild(loader);
