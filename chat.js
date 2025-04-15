@@ -1,4 +1,3 @@
-
 // Chat Widget Script
 (function() {
     // Variables de texto para traducción
@@ -1561,8 +1560,7 @@
     // Función para inicializar el modo oscuro
     function initializeDarkMode() {
         const darkModeConfig = config.style.darkMode;
-        if (darkModeConfig && darkModeConfig.enabled) {
-            const darkModeMediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+        if (darkModeConfig) {
             const themeToggles = chatContainer.querySelectorAll('.theme-toggle');
             const chatWidget = document.querySelector('.n8n-chat-widget');
             
@@ -1575,13 +1573,6 @@
                     localStorage.setItem('chatTheme', 'light');
                 }
             }
-
-            // Escuchar cambios en la preferencia del sistema
-            darkModeMediaQuery.addListener((e) => {
-                if (!localStorage.getItem('chatTheme')) {
-                    updateDarkMode(e.matches);
-                }
-            });
             
             // Manejar el clic en los botones de tema
             themeToggles.forEach(toggle => {
@@ -1599,12 +1590,13 @@
                 });
             });
 
-            // Aplicar el tema guardado o el del sistema
+            // Aplicar solo el tema guardado, sin considerar el tema del sistema
             const savedTheme = localStorage.getItem('chatTheme');
             if (savedTheme) {
                 updateDarkMode(savedTheme === 'dark');
             } else {
-                updateDarkMode(darkModeMediaQuery.matches);
+                // Por defecto siempre en modo claro
+                updateDarkMode(false);
             }
         }
     }
